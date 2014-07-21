@@ -218,6 +218,8 @@ func PeLs(dir, file string) {
 	fmt.Printf("Do other stuff here! No need to wait.\n\n")
 }
 
+// SetFileName("name.ext", "/prefix/", "newext")
+// Return: /prefix/name.newext
 func SetFileName(s string, p string, e string) (res string) {
 	_, filename := filepath.Split(s)
 	if len(e) > 0 {
@@ -296,7 +298,7 @@ func (this *Transcoder) ListCovert() (fname []string) {
 	return fname
 }
 
-func (this Transcoder) FfProbe(dir, filename string) (movie Movies, err error) {
+func (this *Transcoder) FfProbe(dir, filename string) (movie Movies, err error) {
 	arg := []string{
 		"-v",
 		"quiet",
@@ -514,7 +516,7 @@ func (this *Transcoder) ConvMp4(e string, d int) (fout string, err error) {
 }
 
 // TODO remove
-func (this Transcoder) Conv(t string, fromFile string, name string, e string) error {
+func (this *Transcoder) Conv(t string, fromFile string, name string, e string) error {
 	filename := strings.TrimSpace(strings.ToLower(strings.Replace(name, filepath.Ext(name), "."+e, 1)))
 	fout := filepath.Join(this.DirTmp, filename)
 	switch {
@@ -582,35 +584,35 @@ func (this Transcoder) Conv(t string, fromFile string, name string, e string) er
 	return nil
 }
 
-func (this Transcoder) isExitsVod(filename string) (string, error) {
-	dir := filepath.Dir(this.DirVideoVod)
-	fname := filepath.Join(dir, filename)
-	if _, err := os.Stat(fname); os.IsNotExist(err) {
-		return fname, err
-	} else {
-		return fname, nil
-	}
-}
+// func (this Transcoder) isExitsVod(filename string) (string, error) {
+// 	dir := filepath.Dir(this.DirVideoVod)
+// 	fname := filepath.Join(dir, filename)
+// 	if _, err := os.Stat(fname); os.IsNotExist(err) {
+// 		return fname, err
+// 	} else {
+// 		return fname, nil
+// 	}
+// }
 
-func (this Transcoder) isExitsConv(filename string) (string, error) {
-	dir := filepath.Dir(this.DirConvTs)
-	fname := filepath.Join(dir, filename)
-	if _, err := os.Stat(fname); os.IsNotExist(err) {
-		return fname, err
-	} else {
-		return fname, nil
-	}
-}
+// func (this Transcoder) isExitsConv(filename string) (string, error) {
+// 	dir := filepath.Dir(this.DirConvTs)
+// 	fname := filepath.Join(dir, filename)
+// 	if _, err := os.Stat(fname); os.IsNotExist(err) {
+// 		return fname, err
+// 	} else {
+// 		return fname, nil
+// 	}
+// }
 
-func (this Transcoder) isExitsTs(filename string) (string, error) {
-	dir := filepath.Dir(this.DirTs)
-	fname := filepath.Join(dir, filename)
-	if _, err := os.Stat(fname); os.IsNotExist(err) {
-		return fname, err
-	} else {
-		return fname, nil
-	}
-}
+// func (this Transcoder) isExitsTs(filename string) (string, error) {
+// 	dir := filepath.Dir(this.DirTs)
+// 	fname := filepath.Join(dir, filename)
+// 	if _, err := os.Stat(fname); os.IsNotExist(err) {
+// 		return fname, err
+// 	} else {
+// 		return fname, nil
+// 	}
+// }
 
 func (this Transcoder) SetMovie(s string) (m Movies) {
 	this.IsVideo = false
