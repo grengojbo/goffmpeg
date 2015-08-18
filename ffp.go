@@ -23,6 +23,25 @@ var (
 	dirTs        string = "/opt/ts/"
 )
 
+type Movie struct {
+	ID                 int64  `json:"id"`
+	Title              string `json:"title"`
+	Filename           string `json:"filename"`
+	IsVideo            bool   `json:"is_video"`
+	IsAudio            bool   `json:"is_audio"`
+	IsTs               bool   `json:"is_ts"`
+	Duration           int    `json:"duration"`
+	Types              string `json:"types"`   // MOVIE_VIDEO MOVIE_IMAGE MOVIE_AUDIO MOVIE_SERIAL MOVIE_FILM len(12)
+	Formats            string `json:"formats"` // 720p 1080p len(5)
+	Status             string `json:"status"`  // CONV_NO_CONVERT CONV_PROGRES CONV_IS_NOT_CONVERT CONV_CONVERT len(19)
+	Width              int    `json:"width"`
+	Height             int    `json:"height"`
+	CodecVideo         string `json:"codec_video"`
+	CodecAudio         string `json:"codec_audio"`
+	DisplayAspectRatio string `json:"display_aspect_ratio"`
+	BitRate            string `json:"bit_rate"`
+}
+
 type Transcoder struct {
 	Name           string   `json:"name"`
 	Filename       string   `json:"filename"`
@@ -71,8 +90,14 @@ type StreamVideo struct {
 }
 
 type Movies struct {
-	TsVideos []sVideo `json:"streams"`
-	Format   sFormat  `json:"format"`
+	TsVideos       []sVideo `json:"streams"`
+	Format         sFormat  `json:"format"`
+	IsVideo        bool     `json:"isVideo"`
+	IsAudio        bool     `json:"isAudio"`
+	Duration       string   `json:"duration"`
+	DurationSeonds int      `json:"durationSeconds"`
+	CountVideo     int8     `json:"cntVideo"`
+	CountAudio     int8     `json:"cntAudio"`
 }
 
 type sVideo struct {
@@ -296,6 +321,150 @@ func (this *Transcoder) ListCovert() (fname []string) {
 		}
 	}
 	return fname
+}
+
+// filename - полный путь к видео файлу
+func (this *Transcoder) InfoSrc(filename string) (m Movie, err error) {
+	arg := []string{
+		"-v",
+		"quiet",
+		"-print_format",
+		"json",
+		"-show_format",
+		"-show_streams",
+	}
+	// arg = append(arg, fmt.Sprintf("%s%s", dir, file))
+	arg = append(arg, filename)
+	cmd := exec.Command("ffprobe", arg...)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		//log.Fatal("1 ", err)
+		return m, err
+	}
+	if err := cmd.Start(); err != nil {
+		//log.Fatal("2 ", err)
+		return m, err
+	}
+	movie := new(Movies)
+	movie.IsVideo = false
+	movie.IsAudio = false
+	movie.CountVideo = 0
+	movie.CountAudio = 0
+	if err := json.NewDecoder(stdout).Decode(&movie); err != nil {
+		//log.Fatal("3 ", err)
+		return m, err
+	}
+	if err := cmd.Wait(); err != nil {
+		//log.Fatal("4 ", err)
+		return m, err
+	}
+	//fmt.Printf("filename: %s", movie.Format.Filename)
+	// this.Name = SetFileName(movie.Format.Filename, "", "")
+	for _, st := range movie.TsVideos {
+		// dur := strings.Split(st.Duration, ".")
+		durs, dur := utils.DurationToTime(st.Duration)
+		if durs > 0 {
+			movie.DurationSeonds = durs
+			movie.Duration = dur
+			m.Duration = durs
+		}
+		s := Stream{Index: st.Index, CodecName: st.CodecName, CodecType: st.CodecType, Duration: durs}
+		if st.CodecType == "video" {
+			s.IsVideo = true
+			movie.IsVideo = true
+			movie.CountVideo++
+			s.Width = st.Width
+			s.Height = st.Height
+			m.Width = st.Width
+			m.Height = st.Height
+			if m.Width == 1920 && m.Height == 1080 {
+				m.Formats = "1080p"
+			} else if m.Width == 1280 && m.Height == 720 {
+				m.Formats = "720p"
+			}
+			m.CodecVideo = st.CodecName
+			m.DisplayAspectRatio = st.DisplayAspectRatio
+			m.BitRate = st.BitRate
+
+			// fmt.Printf("VIDEO index: %d (%dx%d) duration: %d codec: %s\n", s.Index, s.Width, s.Height, s.Duration, s.CodecName)
+		} else if st.CodecType == "audio" {
+			s.IsAudio = true
+			movie.IsAudio = true
+			movie.CountAudio++
+			m.CodecAudio = st.CodecName
+			// fmt.Printf("AUDIO index: %d duration: %d codec: %s\n", s.Index, s.Duration, s.CodecName)
+		}
+	}
+	// fmt.Println(movie)
+	m.Title = filepath.Base(movie.Format.Filename)
+	m.Filename = movie.Format.Filename
+	m.IsVideo = movie.IsVideo
+	m.IsAudio = movie.IsAudio
+	// m.BitRate = movie.Format.bitRate
+	return m, nil
+}
+
+func (this *Transcoder) Info(filename string) (movie Movies, err error) {
+	arg := []string{
+		"-v",
+		"quiet",
+		"-print_format",
+		"json",
+		"-show_format",
+		"-show_streams",
+	}
+	// arg = append(arg, fmt.Sprintf("%s%s", dir, file))
+	arg = append(arg, filename)
+	cmd := exec.Command("ffprobe", arg...)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		//log.Fatal("1 ", err)
+		return movie, err
+	}
+	if err := cmd.Start(); err != nil {
+		//log.Fatal("2 ", err)
+		return movie, err
+	}
+	//movie := new(Movies)
+	if err := json.NewDecoder(stdout).Decode(&movie); err != nil {
+		//log.Fatal("3 ", err)
+		return movie, err
+	}
+	if err := cmd.Wait(); err != nil {
+		//log.Fatal("4 ", err)
+		return movie, err
+	}
+	//fmt.Printf("filename: %s", movie.Format.Filename)
+	movie.IsVideo = false
+	movie.IsAudio = false
+	movie.CountVideo = 0
+	movie.CountAudio = 0
+	// this.Name = SetFileName(movie.Format.Filename, "", "")
+	for _, st := range movie.TsVideos {
+		// dur := strings.Split(st.Duration, ".")
+		durs, dur := utils.DurationToTime(st.Duration)
+		if durs > 0 {
+			movie.DurationSeonds = durs
+			movie.Duration = dur
+		}
+		s := Stream{Index: st.Index, CodecName: st.CodecName, CodecType: st.CodecType, Duration: durs}
+		if st.CodecType == "video" {
+			s.IsVideo = true
+			movie.IsVideo = true
+			movie.CountVideo++
+			s.Width = st.Width
+			s.Height = st.Height
+			// fmt.Printf("VIDEO index: %d (%dx%d) duration: %d codec: %s\n", s.Index, s.Width, s.Height, s.Duration, s.CodecName)
+		} else if st.CodecType == "audio" {
+			s.IsAudio = true
+			movie.IsAudio = true
+			movie.CountAudio++
+			fmt.Printf("AUDIO index: %d duration: %d codec: %s\n", s.Index, s.Duration, s.CodecName)
+		}
+	}
+	return movie, nil
 }
 
 func (this *Transcoder) FfProbe(dir, filename string) (movie Movies, err error) {
